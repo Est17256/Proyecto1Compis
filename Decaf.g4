@@ -44,13 +44,16 @@ block
 statement
    	:   'if' '(' expression ')' block ('else' block)? #regIfS
 	|   'while' '(' expression ')' block #regElseS
-	|   'return' expression';' #temp1
+	|   'return' expressionOR';' #regRet
 	|   methodCall 	';' #regMethS							
-	|   block #temp2							
+	|   block #regBloc							
 	|   location '=' expression';' #regAssigS										
-	|   (expression)? ';' #temp3	; 
+	|   (expression)? ';' #RegExp	; 
 location  
 	:	(ID|ID '[' expression ']') ('.' location)?    ;
+expressionOR
+	:	expression 
+	|;
 expression
 	:   location #regLocE				
 	|   methodCall #regMethE								
@@ -58,20 +61,27 @@ expression
 	|   '-' expression #reg_E
 	|   '!' expression #regDistE
 	|   '(' expression ')' #regClosE
-	|	expression op expression #regOps ;
+	| 	expression arith_op_5 expression #regAr5
+    | 	expression arith_op_4 expression #regAr4
+    | 	expression arith_op_3 expression #regAr3
+    | 	expression arith_op_2 expression #regAr2
+    | 	expression arith_op_1 expression #regAr1;
 methodCall
 	:	ID '(' (expression(','expression )*)? ')'	;
-
-op
-	:	arith_op   |	rel_op	|	eq_op	|	cond_op	;
-arith_op
-    :	'*'		|	 '/'	|	'%' |	'+'		|	'-'		;
 rel_op
 	:	'<'		|	 '>' 	| 	'<=' 	|	 '>=' 	;
 eq_op
-	: 	'=='	 |	 '!='	 ;
-cond_op
-	:	'&&'	|	'||'	;
+	: 	'=='	|	 '!='	;
+arith_op_5
+	:	'*'		|	 '/' 	| 	'%'		;
+arith_op_4
+	: 	'+' 	| 	 '-'	;
+arith_op_3
+	: 	rel_op  | 	eq_op	;	
+arith_op_2
+	: 	'&&'	;
+arith_op_1
+	: 	'||'	;
 literal
 	:	int_literal    |    char_literal	|	bool_literal	;
 int_literal

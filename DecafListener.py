@@ -116,12 +116,12 @@ class DecafListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by DecafParser#temp1.
-    def enterTemp1(self, ctx:DecafParser.Temp1Context):
+    # Enter a parse tree produced by DecafParser#regRet.
+    def enterRegRet(self, ctx:DecafParser.RegRetContext):
         pass
 
-    # Exit a parse tree produced by DecafParser#temp1.
-    def exitTemp1(self, ctx:DecafParser.Temp1Context):
+    # Exit a parse tree produced by DecafParser#regRet.
+    def exitRegRet(self, ctx:DecafParser.RegRetContext):
         pass
 
 
@@ -134,12 +134,12 @@ class DecafListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by DecafParser#temp2.
-    def enterTemp2(self, ctx:DecafParser.Temp2Context):
+    # Enter a parse tree produced by DecafParser#regBloc.
+    def enterRegBloc(self, ctx:DecafParser.RegBlocContext):
         pass
 
-    # Exit a parse tree produced by DecafParser#temp2.
-    def exitTemp2(self, ctx:DecafParser.Temp2Context):
+    # Exit a parse tree produced by DecafParser#regBloc.
+    def exitRegBloc(self, ctx:DecafParser.RegBlocContext):
         pass
 
 
@@ -152,12 +152,12 @@ class DecafListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by DecafParser#temp3.
-    def enterTemp3(self, ctx:DecafParser.Temp3Context):
+    # Enter a parse tree produced by DecafParser#RegExp.
+    def enterRegExp(self, ctx:DecafParser.RegExpContext):
         pass
 
-    # Exit a parse tree produced by DecafParser#temp3.
-    def exitTemp3(self, ctx:DecafParser.Temp3Context):
+    # Exit a parse tree produced by DecafParser#RegExp.
+    def exitRegExp(self, ctx:DecafParser.RegExpContext):
         pass
 
 
@@ -167,6 +167,15 @@ class DecafListener(ParseTreeListener):
 
     # Exit a parse tree produced by DecafParser#location.
     def exitLocation(self, ctx:DecafParser.LocationContext):
+        pass
+
+
+    # Enter a parse tree produced by DecafParser#expressionOR.
+    def enterExpressionOR(self, ctx:DecafParser.ExpressionORContext):
+        pass
+
+    # Exit a parse tree produced by DecafParser#expressionOR.
+    def exitExpressionOR(self, ctx:DecafParser.ExpressionORContext):
         pass
 
 
@@ -197,12 +206,48 @@ class DecafListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by DecafParser#regOps.
-    def enterRegOps(self, ctx:DecafParser.RegOpsContext):
+    # Enter a parse tree produced by DecafParser#regAr5.
+    def enterRegAr5(self, ctx:DecafParser.RegAr5Context):
         pass
 
-    # Exit a parse tree produced by DecafParser#regOps.
-    def exitRegOps(self, ctx:DecafParser.RegOpsContext):
+    # Exit a parse tree produced by DecafParser#regAr5.
+    def exitRegAr5(self, ctx:DecafParser.RegAr5Context):
+        pass
+
+
+    # Enter a parse tree produced by DecafParser#regAr4.
+    def enterRegAr4(self, ctx:DecafParser.RegAr4Context):
+        pass
+
+    # Exit a parse tree produced by DecafParser#regAr4.
+    def exitRegAr4(self, ctx:DecafParser.RegAr4Context):
+        pass
+
+
+    # Enter a parse tree produced by DecafParser#regAr3.
+    def enterRegAr3(self, ctx:DecafParser.RegAr3Context):
+        pass
+
+    # Exit a parse tree produced by DecafParser#regAr3.
+    def exitRegAr3(self, ctx:DecafParser.RegAr3Context):
+        pass
+
+
+    # Enter a parse tree produced by DecafParser#regAr2.
+    def enterRegAr2(self, ctx:DecafParser.RegAr2Context):
+        pass
+
+    # Exit a parse tree produced by DecafParser#regAr2.
+    def exitRegAr2(self, ctx:DecafParser.RegAr2Context):
+        pass
+
+
+    # Enter a parse tree produced by DecafParser#regAr1.
+    def enterRegAr1(self, ctx:DecafParser.RegAr1Context):
+        pass
+
+    # Exit a parse tree produced by DecafParser#regAr1.
+    def exitRegAr1(self, ctx:DecafParser.RegAr1Context):
         pass
 
 
@@ -242,24 +287,6 @@ class DecafListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by DecafParser#op.
-    def enterOp(self, ctx:DecafParser.OpContext):
-        pass
-
-    # Exit a parse tree produced by DecafParser#op.
-    def exitOp(self, ctx:DecafParser.OpContext):
-        pass
-
-
-    # Enter a parse tree produced by DecafParser#arith_op.
-    def enterArith_op(self, ctx:DecafParser.Arith_opContext):
-        pass
-
-    # Exit a parse tree produced by DecafParser#arith_op.
-    def exitArith_op(self, ctx:DecafParser.Arith_opContext):
-        pass
-
-
     # Enter a parse tree produced by DecafParser#rel_op.
     def enterRel_op(self, ctx:DecafParser.Rel_opContext):
         pass
@@ -278,12 +305,48 @@ class DecafListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by DecafParser#cond_op.
-    def enterCond_op(self, ctx:DecafParser.Cond_opContext):
+    # Enter a parse tree produced by DecafParser#arith_op_5.
+    def enterArith_op_5(self, ctx:DecafParser.Arith_op_5Context):
         pass
 
-    # Exit a parse tree produced by DecafParser#cond_op.
-    def exitCond_op(self, ctx:DecafParser.Cond_opContext):
+    # Exit a parse tree produced by DecafParser#arith_op_5.
+    def exitArith_op_5(self, ctx:DecafParser.Arith_op_5Context):
+        pass
+
+
+    # Enter a parse tree produced by DecafParser#arith_op_4.
+    def enterArith_op_4(self, ctx:DecafParser.Arith_op_4Context):
+        pass
+
+    # Exit a parse tree produced by DecafParser#arith_op_4.
+    def exitArith_op_4(self, ctx:DecafParser.Arith_op_4Context):
+        pass
+
+
+    # Enter a parse tree produced by DecafParser#arith_op_3.
+    def enterArith_op_3(self, ctx:DecafParser.Arith_op_3Context):
+        pass
+
+    # Exit a parse tree produced by DecafParser#arith_op_3.
+    def exitArith_op_3(self, ctx:DecafParser.Arith_op_3Context):
+        pass
+
+
+    # Enter a parse tree produced by DecafParser#arith_op_2.
+    def enterArith_op_2(self, ctx:DecafParser.Arith_op_2Context):
+        pass
+
+    # Exit a parse tree produced by DecafParser#arith_op_2.
+    def exitArith_op_2(self, ctx:DecafParser.Arith_op_2Context):
+        pass
+
+
+    # Enter a parse tree produced by DecafParser#arith_op_1.
+    def enterArith_op_1(self, ctx:DecafParser.Arith_op_1Context):
+        pass
+
+    # Exit a parse tree produced by DecafParser#arith_op_1.
+    def exitArith_op_1(self, ctx:DecafParser.Arith_op_1Context):
         pass
 
 

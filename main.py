@@ -6,29 +6,28 @@ from DecafLexer import DecafLexer
 from DecafParser import DecafParser
 from DecafListener import DecafListener
 from table import *
-
-errors=[]
 #Posibles errores que pueden ocurrir
-errorTable=[
-    "Error de tipo incorrecto",
-    "Fallo al llamar al metodo",
-    "Indefinido",
-    "Metodo inexistente",
-    "Metodo no declarado",
-    "Metodo no valido",
-    "Metodo ya existente",
-    "No hay valor de retorno",
-    "Operado no aceptado",
-    "Parametro ya existente",
-    "Propiedad no pertenece a estruct",
-    "Se declaro como array",
-    "Variable no declarada",
-    "Variable ya existente",
-    "Variables con diferente tipo"
-]
-
+# errorTable=[
+#     "Error de tipo incorrecto",
+#     "Fallo al llamar al metodo",
+#     "Indefinido",
+#     "Metodo inexistente",
+#     "Metodo no declarado",
+#     "Metodo no valido",
+#     "Metodo ya existente",
+#     "No hay valor de retorno",
+#     "Operado no aceptado",
+#     "Parametro ya existente",
+#     "Propiedad no pertenece a estruct",
+#     "Se declaro como array",
+#     "Variable no declarada",
+#     "Variable ya existente",
+#     "Variables con diferente tipo"
+# ]
 class DecafPrinter(DecafListener):
     def __init__(self) -> None:
+        #Contiene los pesos de las variables
+        self.typeSizes = {'int':4, 'char':1, 'boolean':1}
         #contiene la info de los nodos
         self.nodes = {}
         #Ya encontro el main?
@@ -37,25 +36,83 @@ class DecafPrinter(DecafListener):
         self.aStruct = None
         #lista de estructuras encontradas
         self.structs = []
+        self.localOffset = 0
+        self.globalOffset = 0
+        self.structOffset = 0
         #nombre de metodo actual
         self.name = ""
         #en que ambito se ecuentra
         self.aName = "global"
         #nombre del nodo actual
-        self.fNode = ""
+        self.fNode = "None"
         #Valor de funciones repetidas
-        self.sName = 1
-        #Lista de variables encontradas
-        self.varsL = []
-        #Lista de estructuras encontradas
-        self.structsL = []
+        self.cName = 1
+        #Diccionario que contiene los ambitos
+        self.ambDict = {}
+        #Diccionario que contiene las estrucutras
+        self.strDic = {}
+        #Cuadruplas generadas
+        self.lcuads = []
+        #Contiene los argumentros de los nodos
+        self.nodeArg = {}
+        #Contiene el numero de variable por la que vamos
+        self.cVar = 1
+        #Contiene el numero de bloque por el que vamos
+        self.cBloc = 1
+        #Contiene el numero de condicion  por la que vamos
+        self.loops = 1
+        #Contiene el numero de vento por el vamos
+        self.relCounter = 1
+        #Verifica si ya pasamos por el bloque
+        self.visit = False
+        # Contiene posicion de estructura
+        self.currentStructMovement = 0
+        #COntiene informacion del array
+        self.arrayInfo = []
         self.n2Table(None)
         super().__init__()
+    # Imprime las cuadruplas anteriormente realizadas
+    def PrintCuad(self, cuad):
+        cuads = ""
+        if cuad.op == '<' :
+            cuads = '  if ' + cuad.arg1.Name + cuad.op + cuad.arg2.Name + ' GOTO ' + cuad.res.first
+        elif cuad.op== '<=':
+            cuads = '  if ' + cuad.arg1.Name + cuad.op + cuad.arg2.Name + ' GOTO ' + cuad.res.first
+        elif cuad.op == '>':
+            cuads = '  if ' + cuad.arg1.Name + cuad.op + cuad.arg2.Name + ' GOTO ' + cuad.res.first
+        elif cuad.op == '>=':
+            cuads = '  if ' + cuad.arg1.Name + cuad.op + cuad.arg2.Name + ' GOTO ' + cuad.res.first
+        elif cuad.op == '==':
+            cuads = '  if ' + cuad.arg1.Name + cuad.op + cuad.arg2.Name + ' GOTO ' + cuad.res.first
+        elif cuad.op == '!=':
+            cuads = '  if ' + cuad.arg1.Name + cuad.op + cuad.arg2.Name + ' GOTO ' + cuad.res.first
+        elif cuad.op == "LABEL":
+            if cuad.arg1 != None:
+                cuads = cuad.arg1.Name + ":"
+        elif cuad.op == "lTrue":
+            cuads = cuad.arg1.first + ":"
+        elif cuad.op == "lFalse":
+            cuads = cuad.arg1.els + ":"
+        elif cuad.op == "labeln":
+            cuads = cuad.arg1.go + ":"
+        elif cuad.op == "GOTON":
+            cuads = "  GOTO " + cuad.arg1.go
+        elif cuad.op == "GOTOF":
+            cuads = "  GOTO " + cuad.arg1.els
+        elif cuad.res == None:
+            cuads = "  " + cuad.op + " " + cuad.arg1.Name
+        elif cuad.arg2 != None:
+            cuads = "  " + cuad.res.Name + "=" + cuad.arg1.Name  + cuad.op + cuad.arg2.Name 
+        elif cuad.arg2 == None:
+            cuads = "  " + cuad.res.Name + "=" + cuad.op + cuad.arg1.Name 
+        return cuads 
     #Se encarga de verificar si las variables fueron declaradas
     def enterVarDeclaration(self, ctx: DecafParser.VarDeclarationContext):
         #Temp=agrega variable a estrucutra
+        value = None
         arr = False
         if ctx.NUM() != None:
+            value = ctx.getChild(3).getText()
             arr = True
         parentCtx = ctx.parentCtx
         child = parentCtx.getChild(0).getText()
@@ -64,33 +121,39 @@ class DecafPrinter(DecafListener):
         #Si vienen de una estructura agrega la variable a la misma 
         if child == "struct":
             strc = parentCtx.getChild(1).getText()
-            temp = self.v2Struct(strc, vType, var, 0, arr)
+            temp = self.v2Struct(strc, vType, var, "blockVar", value, arr, self.aName)
             if temp:
                 self.nodes[ctx] = 'void'
-            else:
-                self.nodes[ctx] = 'error'
-                print(ctx.start.line,errorTable[12])
-                errors.append([ctx.start.line,errorTable[12]])
         #sino la agrega como variable normal
         else:
-            temp = self.v2Table(vType, var,0,arr)
+            temp = self.v2Table(vType, var, "blockVar", value, arr, self.aName)
             if temp:
                 self.nodes[ctx] = 'void'
-            else:
-                self.nodes[ctx] = 'error'
-                print(ctx.start.line,errorTable[12])
-                errors.append([ctx.start.line,errorTable[12]])
     #Verifica los bloques de codigo que contienen if...
+    #Se encarga de dirijir a las los bloques dependiendo si las condiciones se cumplen o no 
     def enterBlock(self, ctx: DecafParser.BlockContext):
         #Temp=agrega variable a tabla 
         parentCtx = ctx.parentCtx
         child = parentCtx.getChild(0).getText()
         if child not in ['int', 'char', 'boolean', 'struct', 'void']:
-            self.setName(self.name + str(self.sName + 1))
-        #se agrega a la tabla
+            self.cName += 1
+            self.setName(self.name + str(self.cName))
         temp = self.n2Table(self.fNode)
         if temp:
             self.nodes[ctx] = 'void'
+        #Si el tipo del padre es un if
+        if type(parentCtx) == DecafParser.RegIfSContext:
+            tempArg = self.nodeArg[parentCtx.getChild(2)]
+            if self.visit == False:
+                self.lcuads.append(Cuadruples("lTrue", tempArg, None, None))
+                self.visit = True 
+            else:
+                tempArg2 = self.nodeArg[parentCtx.getChild(4)]
+                self.lcuads.append(Cuadruples('GOTON', tempArg2, None, None))
+                self.lcuads.append(Cuadruples("lFalse", tempArg, None, None))
+        if type(parentCtx) == DecafParser.RegElseSContext:
+            tempArg = self.nodeArg[parentCtx.getChild(2)]
+            self.lcuads.append(Cuadruples('lTrue', tempArg, None, None))
     #al encontrar
     def enterLocation(self, ctx: DecafParser.LocationContext):
         if ctx.location():
@@ -118,15 +181,12 @@ class DecafPrinter(DecafListener):
         pType = ctx.getChild(0).getText()
         if pType != 'void':
             name = ctx.getChild(1).getText()
-            temp = self.v2Table(pType, name,1, arr)
+            temp = self.v2Table(pType, name, "PARAM", None, arr, self.aName)
             #si llega es void
             if temp:
                 self.nodes[ctx] = 'void'
-            else:
-                self.nodes[ctx] = 'error'
-                print(ctx.start.line,errorTable[9])
-                errors.append([ctx.start.line,errorTable[9]])
     #se crean los metodos
+    #Se encarga de poder crear el metodo en codigo intermedio
     def enterMethodDeclaration(self, ctx: DecafParser.MethodDeclarationContext):
         #Temp=agrega variable a tabla
         mType = ctx.getChild(0).getText()
@@ -137,44 +197,46 @@ class DecafPrinter(DecafListener):
         temp = self.n2Table(self.fNode, mType)
         if temp:
             self.nodes[ctx] = 'void'
-        else:
-            self.nodes[ctx] = 'error'
-            print(ctx.start.line,errorTable[6])
-            errors.append([ctx.start.line,errorTable[6]])
+            newLabel = "LABEL_"+mName
+            newAddr = Lprops(newLabel, None, None, None)
+            self.lcuads.append(Cuadruples("LABEL", newAddr, None, None))
     #se crean las estructuras
     def enterStructDeclaration(self, ctx: DecafParser.StructDeclarationContext):
         strc = ctx.getChild(1).getText()
         self.s2Table(strc)
     #realiza verificaciones metodos
+    #aqui llamo a todos los metodos y los hijos y busco las direcciones y despues ya guardo lo que tengo dentro de los hijos
     def exitMethodCall(self, ctx: DecafParser.MethodCallContext):
         #sames= compara si los parametros son iguales
         # tTemp= lista con los tipos del metodo
-        #Busca el metodo creado
+        args = ctx.getChild(2).getText()
         meth = self.findMeth(ctx.getChild(0).getText())
         if meth != None:
             tTemp = []
-            #Obtiene los tipos que contiene el metodo
             for i in range(0, len(ctx.children)):
                 if i > 1 and i < len(ctx.children)-1:
-                    if ctx.getChild(i).getText() != ",":
+                    if (ctx.getChild(i).getText() != ","):
                         tTemp.append(self.nodes[ctx.getChild(i)])
             #Compara si los metodos son iguales
-            sames = self.comps(meth, tTemp)
+            sames = self.comps(meth, args, tTemp)
             if sames:
                 self.nodes[ctx] = meth.rType
-            else:
-                self.nodes[ctx] = 'error'
-                print(ctx.start.line,errorTable[1])
-                errors.append([ctx.start.line,errorTable[1]])
-        else:
-            self.nodes[ctx] = 'error'
-            print(ctx.start.line,errorTable[3])
-            errors.append([ctx.start.line,errorTable[3]])
+                for i in range(0, len(ctx.children)):
+                    if i > 1 and i < len(ctx.children)-1:
+                        if (ctx.getChild(i).getText() != ","):
+                            try:
+                                self.lcuads.append(Cuadruples('PARAM', self.nodeArg[ctx.getChild(i)], None, None))
+                            except:
+                                pass
+                methodAddr = Lprops("LABEL_"+ctx.getChild(0).getText()+","+str(len(tTemp)), None, None, None)
+                self.lcuads.append(Cuadruples('CALL', methodAddr, None, None))
     #Verifica si existe el metodo main
     def exitMethodDeclaration(self, ctx: DecafParser.MethodDeclarationContext):
         if ctx.getChild(1).getText() == 'main':
             self.main = True
-        self.sName = 1
+        self.cName = 1
+        self.cVar = 1
+        self.localOffset = 0
         self.name = "global"
         self.setName("global")
     #verifica que se tenga un return valido
@@ -186,149 +248,191 @@ class DecafPrinter(DecafListener):
             exp = ctx.getChild(1)
             #si esta vacio lo guarda como void
             if ctx.getChild(1).getText() == "":
-                if mType == 'void':
+                if (mType == 'void'):
                     self.nodes[ctx] = 'void'
-                #si esta vacio pero el siguiente tiene tipo es error
-                elif mType in ['int', 'char', 'boolean', 'struct']:
-                    self.nodes[ctx] = 'error'
-                    print(ctx.start.line,errorTable[7])
-                    errors.append([ctx.start.line,errorTable[7]])
-                else:
-                    self.nodes[ctx] = 'error'    
-                    print(ctx.start.line,errorTable[5])
-                    errors.append([ctx.start.line,errorTable[5]])
             else:
                 #si tiene tipo verifica que exista para luego comparar tipos
-                if mType in ['int', 'char', 'boolean', 'struct', 'void']:
+                if mType in ['int', 'char', 'boolean', 'struct']:
                     exprType = self.nodes[exp.getChild(0)]
-                    if exprType == mType:
+                    if (exprType == mType):
                         self.nodes[ctx] = 'void'
-                    else:
-                        self.nodes[ctx] = 'error'
-                        print(ctx.start.line,errorTable[0])
-                        errors.append([ctx.start.line,errorTable[0]])
-                else:
-                    self.nodes[ctx] = 'error'  
-                    print(ctx.start.line,errorTable[5])
-                    errors.append([ctx.start.line,errorTable[5]])
     def exitBlock(self, ctx: DecafParser.BlockContext):
         currentBlockObj = self.findMeth(self.aName)
         self.setName(currentBlockObj.sup)
     def exitRegMethS(self, ctx: DecafParser.RegMethSContext):
-        self.nodes[ctx] = self.nodes[ctx.methodCall()]
+        try:
+            self.nodes[ctx] = self.nodes[ctx.methodCall()]
+        except:
+            pass
     def exitProgram(self, ctx: DecafParser.ProgramContext):
-        if not self.main:
+        if (not self.main):
             self.nodes[ctx] = 'error'
-            print(ctx.start.line,errorTable[4])
-            errors.append([ctx.start.line,errorTable[4]])
-    #verifica los tipos de operadores disponibles
-    def exitRegOps(self, ctx: DecafParser.RegOpsContext):
-        #Verifica los tipos y operandos
+    def exitStructDeclaration(self, ctx: DecafParser.StructDeclarationContext):
+        self.structOffset = 0
+    def calculateSize(self, vType, num):
+        num = int(num)
+        if vType in self.typeSizes:
+            return self.typeSizes[vType]*num
+        elif (vType in self.strDic):
+            return self.strDic[vType].size*num
+    #verifica si  hay un ||
+    def enterRegAr1(self, ctx: DecafParser.RegAr1Context):
         op1 = ctx.getChild(0)
         op2 = ctx.getChild(2)
-        op = ctx.getChild(1).getText()
-        #Si alguno de estos debe de ser igual a int
-        if op in ['*','/','%','+','-']:
-            if self.nodes[op1] == 'int' and self.nodes[op2] == 'int':
-                self.nodes[ctx] = 'int'
-            else:
-                self.nodes[ctx] = 'error'    
-                print(ctx.start.line,errorTable[0])
-                errors.append([ctx.start.line,errorTable[0]])
-        #SI es alguno de estos debe de ser ent y retonoa bool
-        elif op in ['<','>','<=','>=']:
-            if self.nodes[op1] == 'int' and self.nodes[op2] == 'int':
-                self.nodes[ctx] = 'boolean'
-            else:
-                self.nodes[ctx] = 'error'
-                print(ctx.start.line,errorTable[0])
-                errors.append([ctx.start.line,errorTable[0]])
-        #Si es alguno de estos puede ser cualquier tipo pero iguales
-        elif op in ['==','!='] :
-            if self.nodes[op1]  in ['int', 'char', 'boolean'] and self.nodes[op2] in ['int', 'char', 'boolean']:
-                if self.nodes[op1] == self.nodes[op2]:
-                    self.nodes[ctx] = 'boolean'
-                else:
-                    self.nodes[ctx] = 'error'
-                    print(ctx.start.line,errorTable[0])  
-                    errors.append([ctx.start.line,errorTable[0]])
-            else:
-                self.nodes[ctx] = 'error'
-                print(ctx.start.line,errorTable[0])
-                errors.append([ctx.start.line,errorTable[0]])
-        #Si es alguno de estos debe de ser bool
-        elif op in ["&&","||"]:
-            if self.nodes[op1] == 'boolean' and self.nodes[op2] == 'boolean':
-                self.nodes[ctx] = 'boolean'
-            else:
-                self.nodes[ctx] = 'error'
-                print(ctx.start.line,errorTable[0])
-                errors.append([ctx.start.line,errorTable[0]])
+        op1False = "LABEL_"+"rel"+str(self.relCounter)+"_FALSE"
+        self.nodeArg[op1] = Lprops(None, self.nodeArg[ctx].first, op1False, None)
+        self.nodeArg[op2] = self.nodeArg[ctx]
+    #verifica si  hay un &&    
+    def enterRegAr2(self, ctx: DecafParser.RegAr2Context):
+        op1 = ctx.getChild(0)
+        op2 = ctx.getChild(2)
+        op1True = "LABEL_"+"rel"+str(self.relCounter)+"_:TRUE"
+        self.nodeArg[op1] = Lprops(None, op1True, self.nodeArg[ctx].els, None)
+        self.nodeArg[op2] = self.nodeArg[ctx]
     #para saber si es ditinto debe de ser bool
+    def enterRegDistE(self, ctx: DecafParser.RegDistEContext):
+        op = ctx.getChild(1)
+        self.nodeArg[op] = self.nodeArg[ctx]
+    #Se encarga de las operaciones y agregar sus valores a las variables
+    def exitRegAr5(self, ctx: DecafParser.RegAr5Context):
+        op1 = ctx.getChild(0)
+        op2 = ctx.getChild(2)
+        operator = ctx.getChild(1).getText()
+        if(self.nodes[op1] == 'int' and self.nodes[op2] == 'int'):
+            self.nodes[ctx] = 'int'
+            nVar ="T" + str(self.cVar)
+            self.cVar += 1
+            self.nodeArg[ctx] = Lprops(nVar, None, None, None)
+            self.lcuads.append(Cuadruples(operator, self.nodeArg[op1], self.nodeArg[op2], self.nodeArg[ctx]))
+    def exitRegAr4(self, ctx: DecafParser.RegAr4Context):
+        op1 = ctx.getChild(0)
+        op2 = ctx.getChild(2)
+        operator = ctx.getChild(1).getText()
+        if(self.nodes[op1] == 'int' and self.nodes[op2] == 'int'):
+            self.nodes[ctx] = 'int'
+            nVar ="T" + str(self.cVar)
+            self.cVar += 1
+            self.nodeArg[ctx] = Lprops(nVar, None, None, None)
+            self.lcuads.append(Cuadruples(operator, self.nodeArg[op1], self.nodeArg[op2], self.nodeArg[ctx]))
+    def exitRegAr3(self, ctx: DecafParser.RegAr3Context):
+        op1 = ctx.getChild(0)
+        op2 = ctx.getChild(2)
+        symbol = ctx.getChild(1).getText()
+        if (symbol == '<' or symbol == '<=' or symbol == '>' or symbol == '>='):
+            if(self.nodes[op1] == 'int' and self.nodes[op2] == 'int'):
+                self.nodes[ctx] = 'boolean'
+                self.lcuads.append(Cuadruples(symbol, self.nodeArg[op1], self.nodeArg[op2], self.nodeArg[ctx]))
+                self.lcuads.append(Cuadruples('GOTOF', self.nodeArg[ctx], None, None))
+                self.relCounter += 1
+        elif (symbol == "==" or symbol == "!="):
+            allowed = ('int', 'char', 'boolean')
+            type1 = self.nodes[op1] 
+            type2 = self.nodes[op2]
+            if (type1 in allowed and type2 in allowed):
+                if(self.nodes[op1] == self.nodes[op2]):
+                    self.nodes[ctx] = 'boolean'
+                    self.lcuads.append(Cuadruples(symbol, self.nodeArg[op1], self.nodeArg[op2], self.nodeArg[ctx]))
+                    self.lcuads.append(Cuadruples('GOTOF', self.nodeArg[ctx], None, None))
+                    self.relCounter += 1
+    def exitRegAr2(self, ctx: DecafParser.RegAr2Context):
+        op1 = ctx.getChild(0)
+        op2 = ctx.getChild(2)
+        if(self.nodes[op1] == 'boolean' and self.nodes[op2] == 'boolean'):
+            self.nodes[ctx] = 'boolean'
+    def exitRegAr1(self, ctx: DecafParser.RegAr1Context):
+        op1 = ctx.getChild(0)
+        op2 = ctx.getChild(2)
+        if(self.nodes[op1] == 'boolean' and self.nodes[op2] == 'boolean'):
+            self.nodes[ctx] = 'boolean'
     def exitRegDistE(self, ctx: DecafParser.RegDistEContext):
         op1 = ctx.getChild(1)
-        if self.nodes[op1] == 'boolean':
+        if(self.nodes[op1] == 'boolean'):
             self.nodes[ctx] = 'boolean'
-        else:
-            self.nodes[ctx] = 'error' 
-            print(ctx.start.line,errorTable[0])
-            errors.append([ctx.start.line,errorTable[0]])
     #para poder restar debe de ser int
     def exitReg_E(self, ctx: DecafParser.Reg_EContext):
         op1 = ctx.getChild(1)
-        if self.nodes[op1] == 'int':
+        if(self.nodes[op1] == 'int'):
             self.nodes[ctx] = 'int'
-        else:
-            self.nodes[ctx] = 'error'
-            print(ctx.start.line,errorTable[0])
-            errors.append([ctx.start.line,errorTable[0]])
+            nVar ="T" + str(self.cVar)
+            self.cVar += 1
+            self.nodeArg[ctx] = Lprops(nVar, None, None, None)
+            self.lcuads.append(Cuadruples('minus', self.nodeArg[op1], None, self.nodeArg(ctx)))
     def exitRegClosE(self, ctx: DecafParser.RegClosEContext):
-        self.nodes[ctx] = self.nodes[ctx.expression()]    
+        self.nodes[ctx] = self.nodes[ctx.expression()]
+        self.nodeArg[ctx] = self.nodeArg[ctx.expression()]
     def exitInt_literal(self, ctx: DecafParser.Int_literalContext):
         self.nodes[ctx] = 'int'
+        self.nodeArg[ctx] = Lprops(ctx.getText(), None, None, None)
     def exitChar_literal(self, ctx: DecafParser.Char_literalContext):
         self.nodes[ctx] = 'char'
+        self.nodeArg[ctx] = Lprops(ctx.getText(), None, None, None)
     def exitBool_literal(self, ctx: DecafParser.Bool_literalContext):
         self.nodes[ctx] = 'boolean'
+        self.nodeArg[ctx] = Lprops(ctx.getText(), None, None, None)
     def exitRegLocE(self, ctx: DecafParser.RegLocEContext):
         self.nodes[ctx] = self.nodes[ctx.getChild(0)]
+        self.nodeArg[ctx] = self.nodeArg[ctx.getChild(0)]
     def exitVarDeclaration(self, ctx: DecafParser.VarDeclarationContext):
         vType = ctx.getChild(0).getText()
-        self.nodes[ctx] = vType
+        self.nodes[ctx] = vType   
     def exitLiteral(self, ctx: DecafParser.LiteralContext):
         self.nodes[ctx] = self.nodes[ctx.getChild(0)]
+        self.nodeArg[ctx] = self.nodeArg[ctx.getChild(0)]    
     def exitRegLitE(self, ctx: DecafParser.RegLitEContext):
         self.nodes[ctx] = self.nodes[ctx.getChild(0)]
+        self.nodeArg[ctx] = self.nodeArg[ctx.getChild(0)]  
     def exitRegMethE(self, ctx: DecafParser.RegMethEContext):
-        self.nodes[ctx] = self.nodes[ctx.getChild(0)]
-    #compara que la asignacion sea del mismo tipo
+        try:
+            self.nodes[ctx] = self.nodes[ctx.getChild(0)]  
+        except:
+            pass 
+    # Crea las cuadruplas y sus valores para el if
+    def enterRegIfS(self, ctx: DecafParser.RegIfSContext):
+        trues = "LABEL_"+"BLOCK"+str(self.cBloc)+"_TRUE"
+        conds = "LABEL_"+"LOOPEND"+str(self.cBloc)+"_NEXT"
+        tempArg2 = Lprops(None, None, None, conds)
+        if (len(ctx.children) > 5):
+            falses = "LABEL_"+"BLOCK"+str(self.cBloc)+"_FALSE"
+            tempArg = Lprops(None, trues, falses, None)
+        else:
+            falses = conds
+            tempArg = Lprops(None, trues, falses, None)
+        self.nodeArg[ctx.getChild(2)] = tempArg
+        self.nodeArg[ctx.getChild(4)] = tempArg2
+    # Crea las cuadruplas y sus valores para el if
+    def enterRegElseS(self, ctx: DecafParser.RegElseSContext):
+        Sconds = "LABEL_"+"LOOP"+str(self.loops)+"_START"
+        trues = "LABEL_"+"BLOCK"+str(self.cBloc)+"_TRUE"
+        falses = "LABEL_"+"LOOPEND"+str(self.cBloc)+"_NEXT"
+        self.nodeArg[ctx.getChild(2)] = Lprops(None, trues, falses, None)
+        self.nodeArg[ctx.getChild(4)] = Lprops(None, None, None, Sconds)
+        self.lcuads.append(Cuadruples('labeln', self.nodeArg[ctx.getChild(4)], None, None))
+    #compara que la asignacion sea del mismo tipo    
     def exitRegAssigS(self, ctx: DecafParser.RegAssigSContext):
         op1 = ctx.getChild(0)
         op2 = ctx.getChild(2)
-        if self.nodes[op1] == self.nodes[op2] :
-            self.nodes[ctx] = self.nodes[op1]
-        else:
-            self.nodes[ctx] = 'error'
-            print(ctx.start.line,errorTable[0])
-            errors.append([ctx.start.line,errorTable[0]])
-    #verifica que sea bool
+        try:
+            if self.nodes[op1] == self.nodes[op2]:
+                self.nodes[ctx] = self.nodes[op1]
+                self.lcuads.append(Cuadruples('', self.nodeArg[op2], None, self.nodeArg[op1]))      
+        except:
+            pass
     def exitRegIfS(self, ctx: DecafParser.RegIfSContext):
         expression = ctx.getChild(2)
-        if self.nodes[expression] == 'boolean':
+        statement = ctx.getChild(4)
+        if(self.nodes[expression] == 'boolean'):
             self.nodes[ctx] = 'boolean'
-        else:
-            self.nodes[ctx] = 'error'
-            print(ctx.start.line,errorTable[0])   
-            errors.append([ctx.start.line,errorTable[0]])
-    #verifica que sea bool
-    def exiRegElseS(self, ctx: DecafParser.RegElseSContext):
+            tempArg2 = self.nodeArg[statement] 
+            self.lcuads.append(Cuadruples("labeln", tempArg2, None, None))
+            self.cBloc += 1
+            self.visit = False 
+    def exitRegElseS(self, ctx: DecafParser.RegElseSContext):
         expression = ctx.getChild(2)
-        if self.nodes[expression] == 'boolean':
+        if(self.nodes[expression] == 'boolean'):
             self.nodes[ctx] = 'boolean'
-        else:
-            self.nodes[ctx] = 'error'  
-            print(ctx.start.line,errorTable[0])
-            errors.append([ctx.start.line,errorTable[0]])
+            self.lcuads.append(Cuadruples("GOTON", self.nodeArg[ctx.getChild(4)], None, None))
+            self.lcuads.append(Cuadruples("lFalse", self.nodeArg[expression], None, None))
+            self.cBloc += 1
     #asigna el nombre del nodo actiual
     def setName(self, amb):
         self.fNode = self.aName
@@ -336,177 +440,159 @@ class DecafPrinter(DecafListener):
     #Agrega los nodos a la tabla
     def n2Table(self, fNode, mType=None):
         ok = False
-        temp=[]
-        for i in  self.varsL:
-            temp.append(i[0])
-        if self.aName not in temp:
-            self.varsL.append([self.aName,Table(sup=fNode, rType=mType, tbl={})])
+        if self.aName not in self.ambDict:
+            self.ambDict[self.aName] = SymbolTableItem(sup=fNode, rType=mType, tbl={})
             ok = True
         else:
             ok = False
         return ok
     #Agrega la variable a la tabla
-    def v2Table(self, vType, var, vPar, arr):
+    def v2Table(self, vType, var, vPar, num, arr, amb):
+        if num == None: 
+            num = 1
         ok = False
-        for i in  self.varsL:
-            if i[0]==self.aName:
-                tempT=i[1]
-        tempT2=tempT.tbl
+        currentVarSize = self.calculateSize(vType, num)
+        currentOffset = 0
+        if (self.aName == 'global'):
+            currentOffset = self.globalOffset
+        else:
+            currentOffset = self.localOffset
+        tempT2 = self.ambDict.get(self.aName).tbl
         if var not in tempT2:
-            tempT2[var] = VarInfo(var, vType, vPar,arr)
+            tempT2[var] = VarInfo(var, vType, vPar, num, currentVarSize, arr, currentOffset, amb)
+            if self.aName == 'global':
+                self.globalOffset += currentVarSize
+            else:
+                self.localOffset += currentVarSize
             ok = True
         else:
             ok = False
-        for i in  self.varsL:
-            if i[0]==self.aName:
-                tempT.tbl=tempT2
-                i[1]=tempT
+        self.ambDict.get(self.aName).tbl = tempT2
         return ok
     #Busca que la variable este en la tabla
     def sVarTable(self, var, scopeName):
-        for i in  self.varsL:
-            if i[0]==scopeName:
-                tempT=i[1]
-        tempT2=tempT.tbl
+        tempT2 = self.ambDict.get(scopeName).tbl
         var2 = None
         if var in tempT2:
             var2 = tempT2[var]
         else:
-            for i in  self.varsL:
-                if i[0]==scopeName:
-                    newScope=i[1]
-            newScope=newScope.sup
+            newScope = self.ambDict.get(scopeName).sup
             if newScope != None:
                 var2 = self.sVarTable(var, newScope)
         return var2
     #busca el metodo dentro de la variable
     def findMeth(self, methodId):
-        for i in  self.varsL:
-            if i[0]==methodId:
-                obj=i[1]
+        obj = self.ambDict.get(methodId)
         return obj
     #Compara el tipo de los metodos
-    def comps(self, meth, tTemp):
+    def comps(self, meth, args, tTemp):
         tbl = meth.tbl
         tTemp2 = []
         for var, varItem in tbl.items():
-            if varItem.vPar == 1:
+            if varItem.vPar == "PARAM":
                 tTemp2.append(varItem.vType)
-        if tTemp == tTemp2:
+        if (tTemp == tTemp2):
             return True 
         else:
             return False
     #Agrega la estructura a la tabla
     def s2Table(self, strc):
         strc = "struct"+strc
-        temp=[]
-        for i in  self.structsL:
-            temp.append(i[0])
-        if strc not in temp:
-            self.structsL.append([strc,StructInfo(strc=strc, sBod={})])
+        if strc not in self.strDic:
+            self.strDic[strc] = StructInfo(strc=strc, sBod={})
     #Agrega las variables a las estructuras
-    def v2Struct(self, strc, vType, var, vPar,arr):
+    def v2Struct(self, strc, vType, var, vPar, num, arr, amb):
+        if (num == None): num = 1
         ok = False
+        currentVarSize = self.calculateSize(vType, num)
+        currentOffset = self.structOffset
         strc = "struct"+strc
-        for i in  self.structsL:
-            if i[0]==strc:
-                tempS=i[1]
-        tempS2=tempS.sBod
+        tempS2 = self.strDic.get(strc).sBod
+        tempStructSize = self.strDic.get(strc).size
         if var not in tempS2:
-            tempS2[var] = VarInfo(var, vType, vPar,arr)
+            tempS2[var] = VarInfo(var, vType, vPar, num, currentVarSize, arr, currentOffset, amb)
+            self.structOffset += currentVarSize
+            tempStructSize += currentVarSize
             ok = True
         else:
             ok = False
-        for i in  self.structsL:
-            if i[0]==strc:
-                tempS.sBod=tempS2
-                i[1]=tempS
+        self.strDic.get(strc).sBod = tempS2
+        self.strDic.get(strc).size = tempStructSize
         return ok
     #Busca dentro de las estructuras
     def sStruct(self, strc):
         sVal = None
-        for i in  self.structsL:
-            if i[0]==strc:
-                sVal=i[1]
+        if strc in self.strDic:
+            sVal = self.strDic[strc]
         return sVal
     #Verifica las propiedades de las estructuras
     def exitLocation(self, ctx: DecafParser.LocationContext):
         var = None
-        if ctx.location() != None:
+        child = False
+        mld = False
+        if (ctx.location() != None):
             if self.structs != []:
                 table = self.structs.pop()
-                if table != None:
+                if (table != None):
                     var = table.sBod[ctx.getChild(0).getText()]
-                    if var != None:
+                    if (var != None):
                         self.nodes[ctx] = self.nodes[ctx.location()]
-                    else:
-                        self.nodes[ctx] = 'error'
-                        print(ctx.start.line,errorTable[10])
-                        errors.append([ctx.start.line,errorTable[10]])
-                else:
-                    self.nodes[ctx] = 'error'
-                    print(ctx.start.line,errorTable[10])
-                    errors.append([ctx.start.line,errorTable[10]])
+                        self.currentStructMovement += var.size
             else:
                 var = self.sVarTable(ctx.getChild(0).getText(), self.aName)
-                if var != None:
+                if (var != None):
                     self.nodes[ctx] = self.nodes[ctx.location()]
-                else:
-                    self.nodes[ctx] = 'error'
-                    print(ctx.start.line,errorTable[2])
-                    errors.append([ctx.start.line,errorTable[2]])
-        elif type(ctx.parentCtx) == DecafParser.LocationContext and ctx.location() == None:
+        elif (type(ctx.parentCtx) == DecafParser.LocationContext and ctx.location() == None):
             if self.structs != []:
                 table = self.structs.pop()
-                if table != None:
+                if (table != None):
                     var = table.sBod[ctx.getChild(0).getText()]
-                    if var != None:                      
-                        self.nodes[ctx] = var.vType        
-                    else:
-                        self.nodes[ctx] = 'error'   
-                        print(ctx.start.line,errorTable[10])   
-                        errors.append([ctx.start.line,errorTable[10]])                           
-                else:
-                    self.nodes[ctx] = 'error'
-                    print(ctx.start.line,errorTable[10])
-                    errors.append([ctx.start.line,errorTable[10]])
+                    if (var != None):                      
+                        self.nodes[ctx] = var.vType    
+                        self.currentStructMovement += var.offset
+                        child = True 
+                        mld = True
         else:
             var = self.sVarTable(ctx.getChild(0).getText(), self.aName)
-            if var != None:
+            if (var != None):
                 self.nodes[ctx] = var.vType
-            else:
-                self.nodes[ctx] = 'error'  
-                print(ctx.start.line,errorTable[12])
-                errors.append([ctx.start.line,errorTable[12]])
         if ctx.expression():
-            if self.nodes[ctx.expression()] != 'int':
-                self.nodes[ctx] = 'error'
-                print(ctx.start.line,errorTable[0])
-                errors.append([ctx.start.line,errorTable[0]])
-            if type(ctx.expression()) == DecafParser.Reg_EContext:
-                self.nodes[ctx] = 'error'
-                print(ctx.start.line,errorTable[0])
-                errors.append([ctx.start.line,errorTable[0]])
             if var != None:
                 if not var.arr:
-                    self.nodes[ctx] = 'error'
-                    print(ctx.start.line,errorTable[0])
-                    errors.append([ctx.start.line,errorTable[0]])
-        else:
-            if var != None:
-                if var.arr:
-                    self.nodes[ctx] = 'error'
-                    print(ctx.start.line,errorTable[11])
-                    errors.append([ctx.start.line,errorTable[11]])
+                    return
+                else:
+                    if child: 
+                        self.arrayInfo = [var.vType, ctx.expression()]
+        if var != None:
+            if ctx.expression() and mld == False:
+                nVar ="T" + str(self.cVar)
+                self.cVar += 1
+                temp = Lprops(nVar, None, None, None)
+                ops = self.nodeArg[ctx.expression()]
+                zType = Lprops(str(self.typeSizes[var.vType]), None, None, None)
+                self.lcuads.append(Cuadruples('*', ops, zType, temp))
+                nVar2 ="T" + str(self.cVar)
+                self.cVar += 1
+                nVar2Addr = Lprops(nVar2, None, None, None)
+                offsetAddr = Lprops(str(var.offset), None, None, None)
+                self.lcuads.append(Cuadruples('+', temp, offsetAddr, nVar2Addr))
+                self.nodeArg[ctx]= Lprops(self.getCodeContext(var)+"["+str(nVar2)+"]", None, None, None)
+            else:
+                self.nodeArg[ctx]= Lprops(self.getCodeContext(var)+"["+str(var.offset)+"]", None, None, None)
     #Busca el typo del metodo
-    def rMethType(self, scope):
-        for i in  self.varsL:
-            if i[0]==scope:
-                obj=i[1]
-        if obj.sup != "global":
+    def rMethType(self, amb):
+        obj = self.ambDict.get(amb)
+        if (obj.sup != "global"):
             obj = self.rMethType(obj.sup)
         return obj
-
+    # Verifica si es global o no
+    def getCodeContext(self, var):
+        if (var.amb == 'global'):
+            codeContext = "G"
+        else:
+            codeContext = "FP"
+        return codeContext
+#---------------------------------------------------------------------------------------------------
 def main(argv):
     input_stream = FileStream(argv)
     lexer = DecafLexer(input_stream)
@@ -516,20 +602,11 @@ def main(argv):
     printer = DecafPrinter()
     walker = ParseTreeWalker()
     walker.walk(printer, tree)
-    file = open("tabla.txt","w")
-    for i in printer.varsL:
-        vars=[]
-        for key in i[1].tbl:
-            vars.append([i[1].tbl[key].var,i[1].tbl[key].vType,i[1].tbl[key].vPar,i[1].tbl[key].arr])
-        file.write(str([i[0],i[1].rType,vars])+'\n')
-    for i in printer.structsL:
-        vars=[]
-        for key in i[1].sBod:
-            vars.append([i[1].sBod[key].var,i[1].sBod[key].vType,i[1].sBod[key].vPar,i[1].sBod[key].arr])
-        file.write(str([i[0],vars])+'\n')
-    file.close()
-    file = open("error.txt","w")
-    for i in errors:
-        file.write(str(i)+'\n')
-    file.close()
-    return []
+    lcuads2 = []
+    for cuad in printer.lcuads:
+        lcuads2.append(printer.PrintCuad(cuad)+"\n")
+    file = open("inter.txt","w")
+    for i in lcuads2:
+        print(i)
+        file.write(i)
+    return lcuads2
